@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+
+<VBox xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.ull.dap.juego.view.MainController"
+      spacing="10" alignment="CENTER" style="-fx-padding: 20;">
+
+    <HBox spacing="10" alignment="CENTER">
+        <VBox spacing="5">
+            <Label text="Civilización 1"/>
+            <ComboBox fx:id="comboCiv1" prefWidth="150"/>
+            <Button text="Crear Soldado" onAction="#crearSoldado1"/>
+            <Button text="Crear Arquero" onAction="#crearArquero1"/>
+            <Button text="Crear Lancero" onAction="#crearLancero1"/>
+            <ListView fx:id="listEjercito1" prefHeight="150"/>
+        </VBox>
+
+        <VBox spacing="5" alignment="CENTER">
+            <Label text="Tipo de Batalla"/>
+            <ComboBox fx:id="comboBatalla" prefWidth="150"/>
+            <Label text="Mapa"/>
+            <ComboBox fx:id="comboMapa" prefWidth="150"/>
+            <Button text="¡LUCHAR!" onAction="#iniciarBatalla" style="-fx-font-size: 16px; -fx-background-color: #ff4d4d;"/>
+            <Button text="Limpiar" onAction="#limpiarBatalla" prefWidth="150"/>
+        </VBox>
+
+        <VBox spacing="5">
+            <Label text="Civilización 2"/>
+            <ComboBox fx:id="comboCiv2" prefWidth="150"/>
+            <Button text="Crear Soldado" onAction="#crearSoldado2"/>
+            <Button text="Crear Arquero" onAction="#crearArquero2"/>
+            <Button text="Crear Lancero" onAction="#crearLancero2"/>
+            <ListView fx:id="listEjercito2" prefHeight="150"/>
+        </VBox>
+    </HBox>
+
+    <Pane fx:id="campoBatalla" style="-fx-background-color: #a3d9a5; -fx-border-color: black;" prefHeight="250" prefWidth="600"/>
+
+    <Label text="Registro de la Batalla:" style="-fx-font-weight: bold; -fx-padding: 10 0 0 0;"/>
+    <TextArea fx:id="logTextArea" editable="false" prefHeight="150"/>
+
+</VBox>
