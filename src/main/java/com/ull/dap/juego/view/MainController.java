@@ -15,11 +15,19 @@ import javafx.fxml.FXML;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextArea;
+import javafx.scene.image.Image;
+import javafx.scene.layout.Background;
+import javafx.scene.layout.BackgroundImage;
+import javafx.scene.layout.BackgroundPosition;
+import javafx.scene.layout.BackgroundRepeat;
+import javafx.scene.layout.BackgroundSize;
 import javafx.scene.layout.Pane;
 import javafx.util.Duration;
 
+import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -54,51 +62,97 @@ public class MainController {
     private Timeline timeline;
     private Random random = new Random();
 
+    /**
+     * Un OutputStream personalizado que redirige la salida a un TextArea de JavaFX.
+     * Utiliza un buffer para manejar correctamente los caracteres multibyte (como UTF-8).
+     * Vuelca el contenido del búfer cuando encuentra un salto de línea o se llama a flush().
+     */
+    private static class TextAreaOutputStream extends OutputStream {
+
+        private final TextArea textArea;
+        private final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+
+        public TextAreaOutputStream(TextArea textArea) {
+            this.textArea = textArea;
+        }
+
+        @Override
+        public void write(int b) {
+            if (b == '\n') {
+                // Al encontrar un salto de línea, vuelca el buffer al TextArea.
+                // Esto asegura que las líneas completas se procesen de una vez.
+                buffer.write(b); // Añade el salto de línea al buffer también
+                flush();
+            } else {
+                buffer.write(b);
+            }
+        }
+
+        @Override
+        public void flush() {
+            // Se ejecuta en el hilo de la aplicación de JavaFX para actualizar la UI de forma segura.
+            javafx.application.Platform.runLater(() -> {
+                // Convierte los bytes del buffer a String usando UTF-8 y los añade al TextArea.
+                textArea.appendText(buffer.toString(StandardCharsets.UTF_8));
+                // Limpia el buffer para la siguiente escritura.
+                buffer.reset();
+            });
+        }
+
+        @Override
+        public void close() {
+            flush(); // Asegurarse de que cualquier contenido restante en el buffer se escriba al cerrar.
+        }
+    }
+
+
     @FXML
     public void initialize() {
-        // Redirigir System.out al TextArea
-        OutputStream out = new OutputStream() {
-            @Override
-            public void write(int b) {
-                logTextArea.appendText(String.valueOf((char) b));
-            }
-        };
-        System.setOut(new PrintStream(out, true));
+        // Redirigir System.out al TextArea usando nuestro OutputStream personalizado y seguro para UTF-8.
+        System.setOut(new PrintStream(new TextAreaOutputStream(logTextArea), true, StandardCharsets.UTF_8));
 
-        // Configurar ComboBox de Civilizaciones
-        List<String> nombresCivs = gestor.getCivilizaciones().stream()
-                .map(c -> c.getClass().getSimpleName().replace("Factory", ""))
-                .collect(Collectors.toList());
-        comboCiv1.setItems(FXCollections.observableArrayList(nombresCivs));
-        comboCiv2.setItems(FXCollections.observableArrayList(nombresCivs));
+        // Configurar ComboBoxes
+        comboCiv1.setItems(FXCollections.observableArrayList("Romana", "Vikinga", "Egipcia"));
+        comboCiv2.setItems(FXCollections.observableArrayList("Romana", "Vikinga", "Egipcia"));
+        comboBatalla.setItems(FXCollections.observableArrayList("Batalla 1v1", "Batalla Masiva"));
+        comboMapa.setItems(FXCollections.observableArrayList("Pradera", "Nieve", "Desierto"));
+
+        // Seleccionar valores por defecto
         comboCiv1.getSelectionModel().selectFirst();
-        comboCiv2.getSelectionModel().select(1);
-
-        // Configurar ComboBox de Batalla
-        comboBatalla.setItems(FXCollections.observableArrayList("Batalla Masiva", "Batalla 1v1"));
+        comboCiv2.getSelectionModel().selectFirst();
         comboBatalla.getSelectionModel().selectFirst();
-
-        // Configurar ComboBox de Mapa
-        comboMapa.setItems(FXCollections.observableArrayList("Pradera", "Desierto", "Nieve"));
         comboMapa.getSelectionModel().selectFirst();
-        comboMapa.getSelectionModel().selectedItemProperty().addListener((options, oldValue, newValue) -> {
-            if (newValue != null) {
-                String mapaSeleccionado = newValue.toLowerCase();
-                String imagePath = "images/maps/" + mapaSeleccionado + ".png";
-                campoBatalla.setStyle("-fx-background-image: url('" + getClass().getResource("/" + imagePath) + "'); " +
-                                      "-fx-background-size: cover; -fx-border-color: black;");
-            }
-        });
-        // Aplicar el mapa por defecto al inicio
-        String mapaInicial = comboMapa.getSelectionModel().getSelectedItem().toLowerCase();
-        String imagePathInicial = "images/maps/" + mapaInicial + ".png";
-        campoBatalla.setStyle("-fx-background-image: url('" + getClass().getResource("/" + imagePathInicial) + "'); " +
-                              "-fx-background-size: cover; -fx-border-color: black;");
-
 
         // Enlazar listas observables a los ListView
         listEjercito1.setItems(ejercito1);
         listEjercito2.setItems(ejercito2);
+
+        // Listener para cambiar el fondo del mapa
+        comboMapa.getSelectionModel().selectedItemProperty().addListener((options, oldValue, newValue) -> {
+            actualizarFondoMapa(newValue);
+        });
+        // Cargar fondo inicial
+        actualizarFondoMapa(comboMapa.getSelectionModel().getSelectedItem());
+
+
+        // Reproducir música de fondo al iniciar
+        GestorSonido.getInstancia().reproducirMusicaFondo();
+    }
+
+    private void actualizarFondoMapa(String nombreMapa) {
+        if (nombreMapa == null) return;
+        String imagePath = "/images/maps/" + nombreMapa.toLowerCase() + ".png";
+        try {
+            Image image = new Image(getClass().getResourceAsStream(imagePath));
+            BackgroundImage backgroundImage = new BackgroundImage(image,
+                    BackgroundRepeat.NO_REPEAT, BackgroundRepeat.NO_REPEAT,
+                    BackgroundPosition.CENTER, new BackgroundSize(100, 100, true, true, true, true));
+            campoBatalla.setBackground(new Background(backgroundImage));
+        } catch (Exception e) {
+            System.err.println("No se pudo cargar la imagen de fondo: " + imagePath);
+            // Opcional: poner un fondo por defecto si falla la carga
+            campoBatalla.setStyle("-fx-background-color: #a3d9a5;");
+        }
     }
 
     private CivilizacionFactory getFactory(String nombre) {
@@ -120,6 +174,7 @@ public class MainController {
         unidadesVisuales1.clear();
         unidadesVisuales2.clear();
         campoBatalla.getChildren().clear();
+        actualizarFondoMapa(comboMapa.getSelectionModel().getSelectedItem()); // Restaurar fondo al limpiar
         logTextArea.clear();
         System.out.println("Campo de batalla limpiado. Listo para un nuevo combate.");
         GestorSonido.getInstancia().reproducirMusicaFondo();
@@ -227,19 +282,19 @@ public class MainController {
         }
 
         switch (mapaSeleccionado) {
-            case "Bosque":
+            case "Pradera":
                 for (Unidad u : todasLasUnidades) {
                     if (u instanceof com.ull.dap.juego.model.unidades.Arquero) {
                         u.setModificadorDefensa(1.25); // 25% más de defensa
-                        logTextArea.appendText(u.getNombre() + " obtiene un bonus de defensa en el bosque.\n");
+                        logTextArea.appendText(u.getNombre() + " obtiene un bonus de defensa en la pradera.\n");
                     }
                 }
                 break;
-            case "Montaña":
+            case "Nieve":
                 for (Unidad u : todasLasUnidades) {
                     if (u instanceof com.ull.dap.juego.model.unidades.Soldado || u instanceof com.ull.dap.juego.model.unidades.Lancero) {
                         u.setModificadorAtaque(1.20); // 20% más de ataque
-                        logTextArea.appendText(u.getNombre() + " obtiene un bonus de ataque en la montaña.\n");
+                        logTextArea.appendText(u.getNombre() + " obtiene un bonus de ataque en la nieve.\n");
                     }
                 }
                 break;
